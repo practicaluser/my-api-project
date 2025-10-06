@@ -1,0 +1,54 @@
+# .github/workflows/python-ci.yml
+
+name: Python Test CI # 워크플로우의 이름
+
+# 1. 언제 이 워크플로우를 실행할 것인가?
+on:
+  push:
+    branches: ['main'] # main 브랜치에 push 될 때마다 실행
+  pull_request:
+    branches: ['main'] # main 브랜치로 pull request가 생성될 때마다 실행
+
+# 2. 어떤 작업들을 수행할 것인가?
+jobs:
+  test: # 'test' 라는 이름의 작업을 정의
+    runs-on: ubuntu-latest # 3. 어떤 환경에서 실행할 것인가? -> 최신 우분투 리눅스
+
+    # 4. '서비스 컨테이너'를 사용하여 MySQL DB를 실행
+    services:
+      mysql:
+        image: mysql:8.0 # Docker Hub의 공식 MySQL 8.0 이미지를 사용
+        env: # 컨테이너 내부의 환경 변수 설정
+          MYSQL_ROOT_PASSWORD: 1234 # conftest.py의 비밀번호와 일치
+          MYSQL_DATABASE: mydatabase_test # conftest.py의 DB 이름과 일치
+        ports:
+          - 3306:3306 # 가상머신의 3306 포트와 MySQL 컨테이너의 3306 포트를 연결
+        # MySQL이 준비될 때까지 기다리기 위한 헬스 체크 옵션
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+
+    # 5. 실제 작업 단계들
+    steps:
+      # 5-1. 리포지토리의 소스 코드를 가상머신으로 내려받기
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 5-2. 파이썬 환경 설정
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11' # 사용할 파이썬 버전 명시
+
+      # 5-3. 파이썬 의존성 라이브러리 설치
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # 5-4. Pytest 실행 (API + 분석 쿼리 테스트)
+      - name: Run Pytest
+        run: |
+          pytest -v
