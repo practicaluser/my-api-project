@@ -4,10 +4,20 @@ from typing import List
 
 # 다른 파일에서 필요한 클래스와 함수들을 가져옵니다.
 from. import models, schemas
+from contextlib import asynccontextmanager
 from.database import SessionLocal, engine
 
 # 데이터베이스 테이블 생성 (애플리케이션 시작 시)
-models.Base.metadata.create_all(bind=engine)
+# models.Base.metadata.create_all(bind=engine) # <-- 이 줄을 삭제하거나 주석 처리!
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # 앱 시작 시 실행될 코드
+    print("INFO:     Creating database tables...")
+    models.Base.metadata.create_all(bind=engine)
+    yield
+    # 앱 종료 시 실행될 코드 (필요 시)
+
 
 app = FastAPI()
 
