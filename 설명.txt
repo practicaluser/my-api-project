@@ -1,0 +1,73 @@
+cd C:\Users\Hope\Desktop\openSource\my-api-project
+venv\Scripts\activate
+
+
+과제 1.1: 기본 RESTful API 서버 
+가짜 DB id, 제목, 내용
+클라이언트에서 보내고 서버에서 처리
+클래스 id, 제목, 내용
+클라이언트에서 보낼 때는 id를 몰라도 보낼 수 있게끔해야 해서 생성과 수정을 위한 클래스 생성
+생성은 무조건 제목과 내용이 들어가야 되고, 수정은 둘 중에 하나만 들어가도 된다.
+저장된 데이터를 가져올 때는 Dict 형태, key와 value로 나누어짐
+
+
+과제 1.2: 데이터베이스 스키마 설계 및 CRUD 구현
+CREATE DATABASE mydatabase;
+pip install sqlalchemy mysql-connector-python 대신에 pip install pymysql 사용
+
+uvicorn app.main:app --reload 
+-app.main → app 폴더 안의 main.py 모듈을 의미
+--여기서 app 은 Python 패키지(app/ 디렉토리 + __init__.py 파일)
+--main 은 그 안의 main.py 파일
+-:app → main.py 안에 있는 FastAPI 인스턴스 객체 이름
+--app = FastAPI()   # 👈 이 객체를 실행
+--reload: 코드가 변경되면 서버를 자동으로 재시작
+
+/api_server
+├── main.py         # (수정) FastAPI 앱 실행 및 API 엔드포인트 로직
+├── database.py     # (신규) 데이터베이스 연결 설정
+├── models.py       # (신규) SQLAlchemy 데이터베이스 모델(테이블) 정의
+└── schemas.py      # (신규) Pydantic 데이터 유효성 검사 모델 정의
+
+
+데이터베이스 스키마 설계가 왜 중요한지 테스트
+
+
+
+과제 1.3: 기초 API 단위/통합 테스트 작성
+pip install pytest httpx
+
+
+
+과제 2.1: SQL 기반 데이터 및 보안 로그 분석
+FastAPI 애플리케이션을 한 번 실행(uvicorn app.main:app --reload)하면 models.Base.metadata.create_all(bind=engine) 코드에 의해 실제 DB에 access_logs와 security_events 테이블이 생성
+
+pip install faker
+python generate_logs.py
+
+sql 쿼리 한 번에 실행하고 결과 보기
+pip install pandas openpyxl
+python run_analysis.py
+
+
+MySQL 데이터베이스를 이미 사용하고 계신다면 my_database.db 파일은 전혀 필요 없으며, SQLite를 사용하실 이유가 없습니다. 
+analysis_queries.sql 파일의 내용을 아래의 전체 코드로 교체해 주세요. SQLite 문법에 맞게 모두 수정한 버전입니다.
+
+
+분석 결과 요약 보고서
+위의 코드를 실행해서 나온 결과를 바탕으로 분석 결과 요약 보고서를 만드려고 하는데 첫번째 케이스는 
+
+
+
+과제 2.2: 모듈형 API 테스트 자동화 프레임워크 구축
+
+my-api-project/
+├── app/
+│   ├── ... (애플리케이션 파일)
+├── scripts/              # 👈 [신규] 유틸리티 스크립트용 폴더
+│   └── create_mock_data.py # 👈 여기에 위치
+├── tests/
+│   ├── __init__.py
+│   ├── conftest.py
+│   └── test_posts_api.py
+└── pytest.ini

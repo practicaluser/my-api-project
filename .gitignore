@@ -1,0 +1,17 @@
+analysis_queries.sql
+generate_logs.py
+run_analysis.py
+
+/analysis_results/
+
+# Python 캐시
+__pycache__/
+*.pyc
+
+# pytest 캐시
+.pytest_cache/
+
+# 가상환경
+.venv/
+env/
+
