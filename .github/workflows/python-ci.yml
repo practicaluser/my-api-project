@@ -9,11 +9,11 @@ on:
   pull_request:
     branches: ['main'] # main 브랜치로 pull request가 생성될 때마다 실행
 
-  # 👇 [신규] 스케줄링 트리거
-  schedule:
-    # cron 표현식: "매시간 0분에 실행" (UTC 기준)
-    # 한국 시간(KST)으로는 매시간 59분이 아닌 정각(09:00, 10:00...)에 실행됩니다.
-    - cron: '10 * * * *'
+  # # 👇 스케줄링 트리거
+  # schedule:
+  #   # cron 표현식: "매시간 0분에 실행" (UTC 기준)
+  #   # 한국 시간(KST)으로는 매시간 59분이 아닌 정각(09:00, 10:00...)에 실행됩니다.
+  #   - cron: '10 * * * *'
 
 # 2. 어떤 작업들을 수행할 것인가?
 jobs:
@@ -54,24 +54,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # 👇 [신규] Pytest 실행 전에 환경 변수가 잘 설정되었는지 확인하는 디버깅 단계
-      - name: Verify Environment Variables
-        env:
-          SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
-          RECEIVER_EMAIL: ${{ secrets.RECEIVER_EMAIL }}
-          EMAIL_APP_PASSWORD: ${{ secrets.EMAIL_APP_PASSWORD }}
-        run: |
-          echo "--- Verifying secrets ---"
-          echo "SENDER_EMAIL is set to: $SENDER_EMAIL"
-          echo "RECEIVER_EMAIL is set to: $RECEIVER_EMAIL"
-
-          if [ -n "$EMAIL_APP_PASSWORD" ]; then
-            echo "✅ EMAIL_APP_PASSWORD secret is set."
-          else
-            echo "❌ EMAIL_APP_PASSWORD secret is NOT set or is empty."
-          fi
-          echo "-------------------------"
-
       # 5-4. Pytest 실행 (API + 분석 쿼리 테스트)
       - name: Run Pytest
         env:
@@ -79,4 +61,4 @@ jobs:
           RECEIVER_EMAIL: ${{ secrets.RECEIVER_EMAIL }}
           EMAIL_APP_PASSWORD: ${{ secrets.EMAIL_APP_PASSWORD }}
         run: |
-          pytest -v -m "simulation"
+          pytest -v -m "not simulation"
