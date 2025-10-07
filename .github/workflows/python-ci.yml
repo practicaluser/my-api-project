@@ -8,14 +8,8 @@ on:
   pull_request:
     branches: ['main']
 
-  # # 👇 스케줄링 트리거
-  # schedule:
-  #   # cron 표현식: "매시간 0분에 실행" (UTC 기준)
-  #   # 한국 시간(KST)으로는 매시간 59분이 아닌 정각(09:00, 10:00...)에 실행됩니다.
-  #   - cron: '10 * * * *'
-
 jobs:
-  # 1. 기존 단위/통합 테스트 작업 (수정 없음)
+  # 1. Unit/Integration Test Job (No changes)
   test:
     runs-on: ubuntu-latest
     services:
@@ -50,19 +44,17 @@ jobs:
         run: |
           pytest -v -m "not simulation"
 
-  # --- 👇 [신규] 성능 테스트 작업 추가 ---
+  # 2. Performance Test Job (All fixes applied)
   performance-test:
-    # 'test' 작업이 성공해야만 이 작업이 실행됩니다.
     needs: test
     runs-on: ubuntu-latest
 
     services:
-      # 성능 테스트용 DB도 동일하게 설정
       mysql:
         image: mysql:8.0
         env:
           MYSQL_ROOT_PASSWORD: 1234
-          MYSQL_DATABASE: mydatabase_test # 실제 DB 이름으로 변경 가능
+          MYSQL_DATABASE: mydatabase_test
         ports:
           - 3306:3306
         options: >-
@@ -70,6 +62,7 @@ jobs:
           --health-interval=10s
           --health-timeout=5s
           --health-retries=3
+        # Correctly apply the command to increase max connections
         command: --max_connections=300
 
     steps:
@@ -84,23 +77,23 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # --- 👇 [신규] DB 테이블 생성 단계 추가 ---
+      # Add step to create DB tables before starting the server
       - name: Create database tables
         run: python init_db.py
 
-      # 6. Gunicorn으로 FastAPI 서버 실행 및 Locust 부하 테스트
+      # Run Gunicorn server and Locust test
       - name: Run FastAPI Server & Locust Performance Test
         run: |
-          # Gunicorn을 백그라운드에서 실행 (&)
+          # Run Gunicorn in the background
           gunicorn -w 4 -k uvicorn.workers.UvicornWorker app.main:app &
 
-          # 서버가 완전히 실행될 때까지 잠시 대기
+          # Wait for the server to be ready
           sleep 5
 
-          # reports 디렉토리 생성
+          # Create reports directory
           mkdir -p reports
 
-          # Locust를 헤드리스 모드로 실행하여 부하 테스트 시작
+          # Run Locust in headless mode
           locust -f performance_tests/locustfile.py \
             --headless \
             --users 300 --spawn-rate 20 \
@@ -108,7 +101,7 @@ jobs:
             --html reports/performance_report.html \
             --csv reports/performance_report
 
-      # 7. 생성된 리포트를 아티팩트로 업로드
+      # Upload the generated reports as an artifact
       - name: Upload Performance Report
         uses: actions/upload-artifact@v4
         with:
