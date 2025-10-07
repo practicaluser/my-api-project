@@ -70,7 +70,7 @@ jobs:
           --health-interval=10s
           --health-timeout=5s
           --health-retries=3
-          --command=--max_connections=300
+          command: --max_connections=300
 
     steps:
       - name: Checkout repository
