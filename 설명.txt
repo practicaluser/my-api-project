@@ -122,7 +122,6 @@ my-api-project/
 
 ---
 
-### **3단계: 부하 테스트 실행 및 실시간 모니터링**
 
 이제 작성된 스크립트로 실제 부하를 발생시켜 보겠습니다.
 
@@ -142,3 +141,6 @@ c
     locust -f performance_tests/locustfile.py
     
 http://localhost:8089
+
+
+pip freeze > requirements.txt
