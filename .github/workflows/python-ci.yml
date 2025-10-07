@@ -55,12 +55,13 @@ jobs:
           MYSQL_DATABASE: mydatabase_test
         ports:
           - 3306:3306
+        volumes:
+          - ./.github/mysql/my.cnf:/etc/mysql/conf.d/custom.cnf
         options: >-
           --health-cmd="mysqladmin ping --silent"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=3
-          --max_connections=300
 
     steps:
       - name: Checkout repository
