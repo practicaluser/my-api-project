@@ -83,6 +83,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      # --- 👇 [신규] DB 테이블 생성 단계 추가 ---
+      - name: Create database tables
+        run: python init_db.py
+
       # 6. Gunicorn으로 FastAPI 서버 실행 및 Locust 부하 테스트
       - name: Run FastAPI Server & Locust Performance Test
         run: |
