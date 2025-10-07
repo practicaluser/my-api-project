@@ -66,6 +66,8 @@ jobs:
           --health-retries=3
 
     steps:
+      - name: Fix Workspace Permissions
+        run: sudo chown -R $USER:$USER $GITHUB_WORKSPACE
       - name: Checkout repository
         uses: actions/checkout@v4
       - name: Set up Python
