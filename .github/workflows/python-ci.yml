@@ -54,6 +54,24 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      # 👇 [신규] Pytest 실행 전에 환경 변수가 잘 설정되었는지 확인하는 디버깅 단계
+      - name: Verify Environment Variables
+        env:
+          SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
+          RECEIVER_EMAIL: ${{ secrets.RECEIVER_EMAIL }}
+          EMAIL_APP_PASSWORD: ${{ secrets.EMAIL_APP_PASSWORD }}
+        run: |
+          echo "--- Verifying secrets ---"
+          echo "SENDER_EMAIL is set to: $SENDER_EMAIL"
+          echo "RECEIVER_EMAIL is set to: $RECEIVER_EMAIL"
+
+          if [ -n "$EMAIL_APP_PASSWORD" ]; then
+            echo "✅ EMAIL_APP_PASSWORD secret is set."
+          else
+            echo "❌ EMAIL_APP_PASSWORD secret is NOT set or is empty."
+          fi
+          echo "-------------------------"
+
       # 5-4. Pytest 실행 (API + 분석 쿼리 테스트)
       - name: Run Pytest
         env:
