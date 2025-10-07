@@ -62,7 +62,6 @@ jobs:
           --health-interval=10s
           --health-timeout=5s
           --health-retries=3
-        # Correctly apply the command to increase max connections
         command: --max_connections=300
 
     steps:
