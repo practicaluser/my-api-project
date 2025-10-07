@@ -1,7 +1,7 @@
 # init_db.py
 
 from app.database import engine, Base
-from app.models import Post  # Post 모델이 정의된 파일을 임포트합니다.
+from app.models import Post, AccessLog, SecurityEvent
 
 def init_database():
     """
