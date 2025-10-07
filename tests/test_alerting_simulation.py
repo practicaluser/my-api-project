@@ -4,7 +4,7 @@ from sqlalchemy import text
 
 # 1. 이전 테스트에서 사용했던 헬퍼 함수와 새로 만든 알림 함수를 가져옵니다.
 from tests.test_analysis_queries import load_queries_from_file
-from services.alerting import send_email_alert
+from app.services.alerting import send_email_alert
 
 # 파일 전체에 마커를 적용합니다.
 pytestmark = pytest.mark.simulation

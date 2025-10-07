@@ -56,5 +56,9 @@ jobs:
 
       # 5-4. Pytest 실행 (API + 분석 쿼리 테스트)
       - name: Run Pytest
+        env:
+          SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
+          RECEIVER_EMAIL: ${{ secrets.RECEIVER_EMAIL }}
+          EMAIL_APP_PASSWORD: ${{ secrets.EMAIL_APP_PASSWORD }}
         run: |
           pytest -v -m "simulation"
