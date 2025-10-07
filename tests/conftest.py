@@ -80,3 +80,33 @@ def setup_test_data(mysql_engine):
     yield
     print("\n[Fixture 정리] 테스트 데이터를 삭제합니다...")
     AnalysisBase.metadata.drop_all(bind=mysql_engine)
+
+# --- 👇 [신규] 데이터 모니터링 테스트용 Fixture ---
+@pytest.fixture(scope="session")
+def setup_normal_operation_data(mysql_engine):
+    """
+    MySQL 테스트 DB에 '정상 상태'의 데이터만 생성합니다.
+    이 Fixture는 이상 징후가 없어야 통과하는 모니터링 테스트에서 사용됩니다.
+    """
+    # ❗️ '정상 상태' 데이터 생성 함수를 불러옵니다.
+    from scripts.create_mock_data import run_normal_data_creation
+    
+    print("\n[Fixture 준비] MySQL '정상 상태' 데이터를 설정합니다...")
+    AnalysisBase.metadata.drop_all(bind=mysql_engine)
+    AnalysisBase.metadata.create_all(bind=mysql_engine)
+    
+    db = Session(mysql_engine)
+    try:
+        # '정상 상태' 데이터 생성 함수 호출
+        run_normal_data_creation(db)
+        db.commit()
+    except Exception as e:
+        print(f"정상 상태 데이터 생성 중 에러 발생: {e}")
+        db.rollback()
+    finally:
+        db.close()
+        
+    print("[Fixture 준비] '정상 상태' 데이터 설정 완료.")
+    yield
+    print("\n[Fixture 정리] 테스트 데이터를 삭제합니다...")
+    AnalysisBase.metadata.drop_all(bind=mysql_engine)

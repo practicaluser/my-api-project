@@ -49,7 +49,7 @@ def _create_guaranteed_scenarios(db: Session): # ✅ db: Session 인자 받기
 
 
 # --- '실무' 함수 2 ---
-def _create_mock_data(db: Session, num_logs: int = 1000): # ✅ db: Session 인자 받기
+def _create_mock_data(db: Session, num_logs: int = 1000, anomalies: bool = True): # ✅ db: Session 인자 받기
     """시나리오 기반의 현실적인 모의 로그 데이터를 생성하고 DB에 저장합니다."""
     print(f"  - {num_logs}개의 배경 노이즈 데이터 생성 중...")
     # (이하 모든 데이터 생성 로직은 사용자님 코드와 100% 동일)
@@ -58,7 +58,16 @@ def _create_mock_data(db: Session, num_logs: int = 1000): # ✅ db: Session 인�
     events_to_add = []
     for _ in range(num_logs):
         log_time = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=random.randint(1, 60 * 24 * 2))
-        scenario = random.choices(["normal", "sqli_attempt", "permission_denied"], weights=[95, 3, 2], k=1)[0]
+
+        # --- 🔽 이 부분이 핵심 수정 사항 🔽 ---
+        if anomalies:
+            # anomalies가 True일 때만 이상 징후 시나리오를 포함
+            scenario = random.choices(["normal", "sqli_attempt", "permission_denied"], weights=[95, 3, 2], k=1)[0]
+        else:
+            # anomalies가 False이면 무조건 'normal' 시나리오만 생성
+            scenario = "normal"
+
+
         ip_addr = fake.ipv4()
         username = fake.user_name()
         log = AccessLog(timestamp=log_time, response_time_ms=abs(random.gauss(80, 50)) + 10)
@@ -84,9 +93,20 @@ def run_data_creation(db: Session, num_logs: int = 5000):
     db.query(SecurityEvent).delete()
     
     # 내부 실무 함수들을 순서대로 호출
-    _create_mock_data(db, num_logs=num_logs)
+    _create_mock_data(db, num_logs=num_logs, anomalies=True) 
     _create_guaranteed_scenarios(db)
     
     print("[데이터 생성 모듈 완료]")
     # ❗️ db.close() 도 여기서 하지 않습니다. (사장님이 처리)
 
+# --- 👇 [신규] 모니터링 테스트를 위한 Public Interface ---
+def run_normal_data_creation(db: Session, num_logs: int = 5000):
+    """(모니터링용) 이상 징후가 없는 '정상 상태'의 배경 데이터만 생성합니다."""
+    print("\n[데이터 생성 모듈 시작 - 정상 상태 데이터]")
+    db.query(AccessLog).delete()
+    db.query(SecurityEvent).delete()
+
+    # '보장된 시나리오' 생성 함수를 호출하지 않는 것이 핵심입니다.
+    _create_mock_data(db, num_logs=num_logs, anomalies=False)
+
+    print("[데이터 생성 모듈 완료 - 정상 상태 데이터]")

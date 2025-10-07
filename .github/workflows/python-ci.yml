@@ -9,6 +9,12 @@ on:
   pull_request:
     branches: ['main'] # main 브랜치로 pull request가 생성될 때마다 실행
 
+  # 👇 [신규] 스케줄링 트리거
+  schedule:
+    # cron 표현식: "매시간 0분에 실행" (UTC 기준)
+    # 한국 시간(KST)으로는 매시간 59분이 아닌 정각(09:00, 10:00...)에 실행됩니다.
+    - cron: '5 * * * *'
+
 # 2. 어떤 작업들을 수행할 것인가?
 jobs:
   test: # 'test' 라는 이름의 작업을 정의
