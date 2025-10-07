@@ -13,7 +13,7 @@ on:
   schedule:
     # cron 표현식: "매시간 0분에 실행" (UTC 기준)
     # 한국 시간(KST)으로는 매시간 59분이 아닌 정각(09:00, 10:00...)에 실행됩니다.
-    - cron: '5 * * * *'
+    - cron: '10 * * * *'
 
 # 2. 어떤 작업들을 수행할 것인가?
 jobs:
@@ -57,4 +57,4 @@ jobs:
       # 5-4. Pytest 실행 (API + 분석 쿼리 테스트)
       - name: Run Pytest
         run: |
-          pytest -v
+          pytest -v -m "simulation"

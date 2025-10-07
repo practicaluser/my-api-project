@@ -72,3 +72,28 @@ my-api-project/
 │   ├── conftest.py
 │   └── test_posts_api.py
 └── pytest.ini
+
+
+
+my-api-project/
+├── app/
+│   ├── services/             # 👈 [신규] 서비스 로직용 폴더
+│   │   └── alerting.py       # 👈 여기에 위치
+│   └── ... (main.py 등 다른 파일)
+├── scripts/
+│   └── create_mock_data.py
+├── tests/
+│   ├── conftest.py
+│   ├── test_alerting_simulation.py
+│   └── ... (다른 테스트 파일)
+└── ...
+
+
+GitHub Actions 환경: Secrets 사용
+
+GitHub 저장소의 Settings > Secrets and variables > Actions 메뉴에서 SENDER_EMAIL, RECEIVER_EMAIL, EMAIL_PASSWORD 같은 민감 정보를 Secrets로 등록합니다.
+
+워크플로우 파일(.github/workflows/python-ci.yml)에서 이 Secrets를 환경 변수로 주입해 줄 수 있습니다.
+
+
+평소에는 pytest -v -m "not simulation"으로 시뮬레이션을 제외한 모든 테스트를 빠르게 실행합니다.
