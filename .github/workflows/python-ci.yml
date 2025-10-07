@@ -67,6 +67,8 @@ jobs:
           --health-retries=3
 
     steps:
+      - name: Force cleanup mysql config directory
+        run: sudo rm -rf .github/mysql
       - name: Checkout repository
         uses: actions/checkout@v4
       - name: Set up Python
