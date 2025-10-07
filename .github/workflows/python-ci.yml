@@ -1,13 +1,12 @@
 # .github/workflows/python-ci.yml
 
-name: Python Test CI # 워크플로우의 이름
+name: Python Test and Performance CI
 
-# 1. 언제 이 워크플로우를 실행할 것인가?
 on:
   push:
-    branches: ['main'] # main 브랜치에 push 될 때마다 실행
+    branches: ['main']
   pull_request:
-    branches: ['main'] # main 브랜치로 pull request가 생성될 때마다 실행
+    branches: ['main']
 
   # # 👇 스케줄링 트리거
   # schedule:
@@ -15,46 +14,34 @@ on:
   #   # 한국 시간(KST)으로는 매시간 59분이 아닌 정각(09:00, 10:00...)에 실행됩니다.
   #   - cron: '10 * * * *'
 
-# 2. 어떤 작업들을 수행할 것인가?
 jobs:
-  test: # 'test' 라는 이름의 작업을 정의
-    runs-on: ubuntu-latest # 3. 어떤 환경에서 실행할 것인가? -> 최신 우분투 리눅스
-
-    # 4. '서비스 컨테이너'를 사용하여 MySQL DB를 실행
+  # 1. 기존 단위/통합 테스트 작업 (수정 없음)
+  test:
+    runs-on: ubuntu-latest
     services:
       mysql:
-        image: mysql:8.0 # Docker Hub의 공식 MySQL 8.0 이미지를 사용
-        env: # 컨테이너 내부의 환경 변수 설정
-          MYSQL_ROOT_PASSWORD: 1234 # conftest.py의 비밀번호와 일치
-          MYSQL_DATABASE: mydatabase_test # conftest.py의 DB 이름과 일치
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: 1234
+          MYSQL_DATABASE: mydatabase_test
         ports:
-          - 3306:3306 # 가상머신의 3306 포트와 MySQL 컨테이너의 3306 포트를 연결
-        # MySQL이 준비될 때까지 기다리기 위한 헬스 체크 옵션
+          - 3306:3306
         options: >-
           --health-cmd="mysqladmin ping --silent"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=3
-
-    # 5. 실제 작업 단계들
     steps:
-      # 5-1. 리포지토리의 소스 코드를 가상머신으로 내려받기
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      # 5-2. 파이썬 환경 설정
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11' # 사용할 파이썬 버전 명시
-
-      # 5-3. 파이썬 의존성 라이브러리 설치
+          python-version: '3.11'
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-
-      # 5-4. Pytest 실행 (API + 분석 쿼리 테스트)
       - name: Run Pytest
         env:
           SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
@@ -62,3 +49,63 @@ jobs:
           EMAIL_APP_PASSWORD: ${{ secrets.EMAIL_APP_PASSWORD }}
         run: |
           pytest -v -m "not simulation"
+
+  # --- 👇 [신규] 성능 테스트 작업 추가 ---
+  performance-test:
+    # 'test' 작업이 성공해야만 이 작업이 실행됩니다.
+    needs: test
+    runs-on: ubuntu-latest
+
+    services:
+      # 성능 테스트용 DB도 동일하게 설정
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: 1234
+          MYSQL_DATABASE: mydatabase_test # 실제 DB 이름으로 변경 가능
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # 6. Gunicorn으로 FastAPI 서버 실행 및 Locust 부하 테스트
+      - name: Run FastAPI Server & Locust Performance Test
+        run: |
+          # Gunicorn을 백그라운드에서 실행 (&)
+          gunicorn -w 4 -k uvicorn.workers.UvicornWorker app.main:app &
+
+          # 서버가 완전히 실행될 때까지 잠시 대기
+          sleep 5
+
+          # reports 디렉토리 생성
+          mkdir -p reports
+
+          # Locust를 헤드리스 모드로 실행하여 부하 테스트 시작
+          locust -f performance_tests/locustfile.py \
+            --headless \
+            --users 300 --spawn-rate 20 \
+            --run-time 1m \
+            --html reports/performance_report.html \
+            --csv reports/performance_report
+
+      # 7. 생성된 리포트를 아티팩트로 업로드
+      - name: Upload Performance Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: locust-report
+          path: reports/

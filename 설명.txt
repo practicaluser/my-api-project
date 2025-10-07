@@ -75,6 +75,7 @@ my-api-project/
 
 
 
+과제 2.4: 간단한 보안/운영 자동화 도구 개발
 my-api-project/
 ├── app/
 │   ├── services/             # 👈 [신규] 서비스 로직용 폴더
@@ -90,11 +91,54 @@ my-api-project/
 └── ...
 
 
-GitHub Actions 환경: Secrets 사용
 
-GitHub 저장소의 Settings > Secrets and variables > Actions 메뉴에서 SENDER_EMAIL, RECEIVER_EMAIL, EMAIL_PASSWORD 같은 민감 정보를 Secrets로 등록합니다.
-
-워크플로우 파일(.github/workflows/python-ci.yml)에서 이 Secrets를 환경 변수로 주입해 줄 수 있습니다.
-
-
+pytest -v -m "simulation"
 평소에는 pytest -v -m "not simulation"으로 시뮬레이션을 제외한 모든 테스트를 빠르게 실행합니다.
+
+
+pytest -v -m "simulation" --log-cli-level=INFO -s
+
+
+과제 3.1: API 성능 벤치마킹 및 부하 테스트
+pip install locust
+pip freeze > requirements.txt 명령어를 실행하여 설치된 라이브러리 목록을 갱신
+
+my-api-project/
+├── .github/
+│   └── workflows/
+│       └── python-ci.yml
+├── app/
+│   ├── ... (기존 파일들)
+├── performance_tests/    # 👈 [신규] 부하 테스트 폴더
+│   └── locustfile.py     # 👈 [신규] Locust 시나리오 파일
+├── tests/
+│   └── ... (기존 파일들)
+├── requirements.txt      # (업데이트됨)
+└── ...
+
+
+
+```
+
+---
+
+### **3단계: 부하 테스트 실행 및 실시간 모니터링**
+
+이제 작성된 스크립트로 실제 부하를 발생시켜 보겠습니다.
+
+1.  **API 서버 실행 (운영 모드)**
+    먼저, Gunicorn을 사용하여 여러 워커로 API 서버를 실행합니다. 터미널을 새로 열고 프로젝트 루트에서 다음 명령어를 실행하세요.
+    ```bash
+    # 4개의 워커 프로세스로 Gunicorn 서버를 실행합니다.
+    gunicorn -w 4 -k uvicorn.workers.UvicornWorker app.main:app
+    ```
+
+c
+
+
+2.  **Locust 실행**
+    또 다른 터미널을 열고, 프로젝트 루트에서 다음 명령어를 실행하여 Locust를 시작합니다.
+    ```bash
+    locust -f performance_tests/locustfile.py
+    
+http://localhost:8089
