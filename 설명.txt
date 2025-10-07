@@ -80,6 +80,7 @@ my-api-project/
 │   ├── services/             # 👈 [신규] 서비스 로직용 폴더
 │   │   └── alerting.py       # 👈 여기에 위치
 │   └── ... (main.py 등 다른 파일)
+│   └── logger_config.py
 ├── scripts/
 │   └── create_mock_data.py
 ├── tests/
