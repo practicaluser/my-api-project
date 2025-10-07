@@ -61,7 +61,6 @@ python-engineio==4.12.3
 python-multipart==0.0.20
 python-socketio==5.13.0
 pytz==2025.2
-pywin32==311
 PyYAML==6.0.3
 pyzmq==27.1.0
 requests==2.32.5
