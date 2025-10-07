@@ -57,12 +57,14 @@ jobs:
           MYSQL_DATABASE: mydatabase_test
         ports:
           - 3306:3306
+        # --- 👇 [수정] command 대신 volumes 사용 ---
+        volumes:
+          - ./.github/mysql:/etc/mysql/conf.d
         options: >-
           --health-cmd="mysqladmin ping --silent"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=3
-        command: --max_connections=300
 
     steps:
       - name: Checkout repository
