@@ -137,8 +137,6 @@ my-api-project/
     gunicorn -w 4 -k uvicorn.workers.UvicornWorker app.main:app
     ```
 
-c
-
 
 2.  **Locust 실행**
     또 다른 터미널을 열고, 프로젝트 루트에서 다음 명령어를 실행하여 Locust를 시작합니다.
@@ -148,7 +146,14 @@ c
 http://localhost:8089
 
 
-과제 3.2: 자동화된 웹 취약점 스캐닝
+과제 3.2: 고급 CI/CD: 테스트 게이트 및 Docker화 구현
+
+pip install black
+black .
+pip install ruff
+ruff check . --fix
+
+pre-commit을 설정하면 이런 사소한 스타일 및 품질 문제를 CI/CD 단계까지 가져가지 않고, 커밋하는 시점에 개발자 PC에서 미리 해결할 수 있어 훨씬 효율적입니다. 이번 기회에 pre-commit 설정을 완료
 
 my-api-project/
 ├── .github/

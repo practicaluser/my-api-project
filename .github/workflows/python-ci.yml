@@ -68,7 +68,7 @@ jobs:
 
       - name: Build and run containers with Docker Compose
         # --build: 이미지를 빌드하고, -d: 백그라운드에서 컨테이너를 실행합니다.
-        run: docker-compose up -d --build
+        run: docker compose up -d --build
 
       - name: Wait for services to be healthy
         # API 서버가 정상적으로 응답할 때까지 최대 60초간 대기합니다.
@@ -89,7 +89,7 @@ jobs:
       - name: Clean up containers
         # 테스트 성공/실패 여부와 관계없이 항상 컨테이너를 정리합니다.
         if: always()
-        run: docker-compose down
+        run: docker compose down
 
   # =======================================================
   # Job 3: Docker 이미지 푸시 (Push to Registry)
