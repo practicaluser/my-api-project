@@ -36,6 +36,6 @@ def send_email_alert(subject: str, body: str, findings_df: pd.DataFrame):
 
         logger.info("✅ 이메일 알림을 성공적으로 발송했습니다.")
 
-    except Exception as e:
+    except Exception:
         # 4. (핵심) 에러 발생 시, 에러의 전체 추적 내용을 로그로 남깁니다.
         logger.error("❌ 이메일 발송 중 에러 발생", exc_info=True)

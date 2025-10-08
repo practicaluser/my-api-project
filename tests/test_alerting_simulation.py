@@ -50,7 +50,7 @@ def test_detection_and_alerting_pipeline(mysql_engine, setup_test_data):
         # 3. (핵심) 쿼리 결과가 비어있지 않다면(= 탐지 성공), 알림 함수를 호출합니다.
         if not df.empty:
             alert_triggered = True
-            print(f"  🚨 이상 징후 탐지! 알림을 생성합니다...")
+            print("  🚨 이상 징후 탐지! 알림을 생성합니다...")
             send_email_alert(
                 subject=details["subject"], body=details["body"], findings_df=df
             )

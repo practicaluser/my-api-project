@@ -4,7 +4,7 @@ from faker import Faker
 from sqlalchemy.orm import Session
 
 # ❗️ app.database 에서 직접 engine, SessionLocal을 가져오지 않습니다.
-from app.models import Base, AccessLog, SecurityEvent, Post
+from app.models import AccessLog, SecurityEvent
 
 fake = Faker()
 
