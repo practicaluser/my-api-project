@@ -118,6 +118,7 @@ my-api-project/
 ├── tests/
 │   └── ... (기존 파일들)
 ├── requirements.txt      # (업데이트됨)
+├── init_db.py
 └── ...
 
 
@@ -147,3 +148,29 @@ c
 http://localhost:8089
 
 
+과제 3.2: 자동화된 웹 취약점 스캐닝
+
+my-api-project/
+├── .github/
+│   └── workflows/
+│       └── python-ci.yml       # CI/CD 자동화 워크플로우
+├── app/
+│   ├── __init__.py
+│   ├── main.py                 # FastAPI 애플리케이션
+│   ├── models.py               # SQLAlchemy DB 모델
+│   ├── schemas.py              # Pydantic 데이터 스키마
+│   └── database.py             # DB 연결 및 세션 관리
+├── performance_tests/
+│   └── locustfile.py           # Locust 부하 테스트 스크립트
+├── scripts/
+│   └── create_mock_data.py     # 분석용 모의 데이터 생성 스크립트
+├── tests/
+│   ├── __init__.py
+│   ├── conftest.py             # Pytest 공용 Fixture 관리
+│   ├── test_analysis_queries.py # 데이터 분석 쿼리 테스트
+│   └── test_posts_api.py       # API 기능 테스트
+├── .env                	# 환경 변수 
+├── .gitignore                  # Git 추적 제외 파일
+├── analysis_queries.sql        # 데이터 분석용 고급 SQL 쿼리
+├── pytest.ini                  # Pytest 설정
+└── requirements.txt            # Python 의존성 라이브러리

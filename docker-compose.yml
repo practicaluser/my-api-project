@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  # 1. 테스트 대상인 API 서버 컨테이너 정의
+  api:
+    # Dockerfile을 사용하여 현재 디렉토리에서 이미지를 빌드
+    build: .
+    # 컨테이너 이름을 'my-api'로 지정
+    container_name: my-api
+    # 환경 변수 파일 (.env)을 컨테이너에 전달
+    env_file:
+      - ./.env
+    # 포트 매핑: 호스트의 8000번 포트를 컨테이너의 8000번 포트와 연결
+    ports:
+      - "8000:8000"
+    # 'db' 서비스가 먼저 실행된 후에 'api' 서비스가 시작되도록 의존성 설정
+    depends_on:
+      db:
+        # 'db' 서비스가 건강한 상태(healthy)가 될 때까지 기다림
+        condition: service_healthy
+
+  # 2. 테스트에 사용할 MySQL DB 컨테이너 정의
+  db:
+    image: mysql:8.0
+    container_name: my-api-db
+    # MySQL 컨테이너가 재시작되어도 데이터를 보존하기 위해 볼륨 설정
+    volumes:
+      - mysql_data:/var/lib/mysql
+    # DB 컨테이너에 필요한 환경 변수 설정
+    environment:
+      MYSQL_ROOT_PASSWORD: 1234
+      MYSQL_DATABASE: mydatabase_test
+    ports:
+      - "3306:3306"
+    # 컨테이너가 정상적으로 실행 중인지 확인하는 상태 체크(healthcheck) 설정
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+# Docker Compose가 관리할 명명된 볼륨 정의
+volumes:
+  mysql_data:

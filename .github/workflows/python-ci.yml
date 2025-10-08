@@ -1,6 +1,6 @@
-# .github/workflows/python-ci.yml
+# .github/workflows/python-app-ci.yml
 
-name: Python Test and Performance CI
+name: Python DevSecOps CI Pipeline
 
 on:
   push:
@@ -8,101 +8,125 @@ on:
   pull_request:
     branches: ['main']
 
-  # # 👇 스케줄링 트리거
-  # schedule:
-  #   # cron 표현식: "매시간 0분에 실행" (UTC 기준)
-  #   # 한국 시간(KST)으로는 매시간 59분이 아닌 정각(09:00, 10:00...)에 실행됩니다.
-  #   - cron: '10 * * * *'
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  # 1. 기존 단위/통합 테스트 작업 (수정 없음)
-  test:
+  # =======================================================
+  # Job 1: 정적 분석 (Static Analysis Quality Gate)
+  # =======================================================
+  # 코드 스타일, 포맷, 잠재적 오류를 검사합니다.
+  static-analysis:
+    name: 1. Static Analysis
     runs-on: ubuntu-latest
-    services:
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_ROOT_PASSWORD: 1234
-          MYSQL_DATABASE: mydatabase_test
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping --silent"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=3
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-      - name: Run Pytest
-        env:
-          SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
-          RECEIVER_EMAIL: ${{ secrets.RECEIVER_EMAIL }}
-          EMAIL_APP_PASSWORD: ${{ secrets.EMAIL_APP_PASSWORD }}
-        run: |
-          pytest -v -m "not simulation"
-  # --- 👇 [신규] 성능 테스트 작업 추가 ---
-  performance-test:
-    # 'test' 작업이 성공해야만 이 작업이 실행됩니다.
-    needs: test
-    runs-on: ubuntu-latest
+          cache: 'pip' # pip 캐싱으로 의존성 설치 속도 향상
 
-    services:
-      # 성능 테스트용 DB도 동일하게 설정
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_ROOT_PASSWORD: 1234
-          MYSQL_DATABASE: mydatabase_test # 실제 DB 이름으로 변경 가능
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping --silent"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=3
+      - name: Install dependencies
+        run: pip install black ruff safety
+
+      - name: Check formatting with Black
+        # --check 플래그는 코드를 수정하지 않고 포맷팅이 필요한 파일이 있는지 검사합니다.
+        run: black --check .
+
+      - name: Lint with Ruff
+        # Ruff는 매우 빠른 Python 린터로, Flake8과 isort 등을 대체할 수 있습니다.
+        run: ruff check .
+
+      - name: Scan dependencies with Safety
+        # requirements.txt에 명시된 의존성 라이브러리의 알려진 보안 취약점을 검사합니다.
+        run: safety check -r requirements.txt
+
+  # =======================================================
+  # Job 2: 빌드 및 통합 테스트 (Build & Test Gate)
+  # =======================================================
+  # Docker Compose로 실제 운영 환경과 유사한 환경을 구성하고 테스트를 실행합니다.
+  build-and-test:
+    name: 2. Build and Integration Test
+    needs: static-analysis
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-      # --- 👇 [신규] DB 테이블 생성 단계 추가 ---
-      - name: Create database tables
-        run: python init_db.py
 
-      # 6. Gunicorn으로 FastAPI 서버 실행 및 Locust 부하 테스트
-      - name: Run FastAPI Server & Locust Performance Test
+      - name: Create .env file for Docker Compose
+        # GitHub Secrets를 사용하여 테스트에 필요한 환경변수 파일을 생성합니다.
         run: |
-          # Gunicorn을 백그라운드에서 실행 (&)
-          gunicorn -w 2 -k uvicorn.workers.UvicornWorker app.main:app &
-          sleep 5
-          # reports 디렉토리 생성
-          mkdir -p reports
-          # Locust를 헤드리스 모드로 실행하여 부하 테스트 시작
-          locust -f performance_tests/locustfile.py \
-            --headless \
-            --users 20 --spawn-rate 5 \
-            --run-time 30s \
-            --html reports/performance_report.html \
-            --csv reports/performance_report
-      # 7. 생성된 리포트를 아티팩트로 업로드
-      - name: Upload Performance Report
-        uses: actions/upload-artifact@v4
+          echo "DATABASE_URL=mysql+pymysql://root:1234@db:3306/mydatabase_test" > .env
+          echo "SENDER_EMAIL=${{ secrets.SENDER_EMAIL }}" >> .env
+          echo "RECEIVER_EMAIL=${{ secrets.RECEIVER_EMAIL }}" >> .env
+          echo "EMAIL_APP_PASSWORD=${{ secrets.EMAIL_APP_PASSWORD }}" >> .env
+
+      - name: Build and run containers with Docker Compose
+        # --build: 이미지를 빌드하고, -d: 백그라운드에서 컨테이너를 실행합니다.
+        run: docker-compose up -d --build
+
+      - name: Wait for services to be healthy
+        # API 서버가 정상적으로 응답할 때까지 최대 60초간 대기합니다.
+        run: |
+          echo "Waiting for the API server to be ready..."
+          timeout 60s bash -c 'until curl -s http://localhost:8000/docs > /dev/null; do echo "Waiting..."; sleep 2; done'
+
+      - name: Install test dependencies on runner
+        # Runner에 직접 테스트 실행에 필요한 라이브러리를 설치합니다.
+        run: pip install pytest httpx
+
+      - name: Run Pytest against the running container
+        # 실행 중인 API 컨테이너를 대상으로 통합 테스트를 수행합니다.
+        run: pytest -v
+        env:
+          API_BASE_URL: 'http://localhost:8000'
+
+      - name: Clean up containers
+        # 테스트 성공/실패 여부와 관계없이 항상 컨테이너를 정리합니다.
+        if: always()
+        run: docker-compose down
+
+  # =======================================================
+  # Job 3: Docker 이미지 푸시 (Push to Registry)
+  # =======================================================
+  # 모든 테스트를 통과한 이미지를 GitHub Container Registry에 배포합니다.
+  push-to-registry:
+    name: 3. Push Docker Image to GHCR
+    needs: build-and-test
+    # 'main' 브랜치에 'push' 이벤트가 발생했을 때만 실행됩니다.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # GHCR에 이미지를 푸시하기 위한 권한
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
         with:
-          name: locust-report
-          path: reports/
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        # Git 정보를 기반으로 Docker 이미지 태그와 라벨을 자동으로 생성합니다.
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
