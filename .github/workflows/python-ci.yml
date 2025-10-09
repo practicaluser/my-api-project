@@ -1,5 +1,3 @@
-# .github/workflows/python-app-ci.yml
-
 name: Python DevSecOps CI Pipeline
 
 on:
@@ -14,9 +12,8 @@ env:
 
 jobs:
   # =======================================================
-  # Job 1: 정적 분석 (Static Analysis Quality Gate)
+  # Job 1: Static Analysis Quality Gate
   # =======================================================
-  # 코드 스타일, 포맷, 잠재적 오류를 검사합니다.
   static-analysis:
     name: 1. Static Analysis
     runs-on: ubuntu-latest
@@ -28,27 +25,25 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          cache: 'pip' # pip 캐싱으로 의존성 설치 속도 향상
+          cache: 'pip' # Speed up dependency installation by caching
 
       - name: Install dependencies
         run: pip install black ruff safety
 
       - name: Check formatting with Black
-        # --check 플래그는 코드를 수정하지 않고 포맷팅이 필요한 파일이 있는지 검사합니다.
         run: black --check .
 
       - name: Lint with Ruff
-        # Ruff는 매우 빠른 Python 린터로, Flake8과 isort 등을 대체할 수 있습니다.
         run: ruff check .
 
       - name: Scan dependencies with Safety
-        # requirements.txt에 명시된 의존성 라이브러리의 알려진 보안 취약점을 검사합니다.
-        run: safety check -r requirements.txt
+        run: |
+          pip install -r requirements.txt
+          safety check -r requirements.txt
 
   # =======================================================
-  # Job 2: 빌드 및 통합 테스트 (Build & Test Gate)
+  # Job 2: Build & Integration Test Gate
   # =======================================================
-  # Docker Compose로 실제 운영 환경과 유사한 환경을 구성하고 테스트를 실행합니다.
   build-and-test:
     name: 2. Build and Integration Test
     needs: static-analysis
@@ -59,7 +54,6 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Create .env file for Docker Compose
-        # GitHub Secrets를 사용하여 테스트에 필요한 환경변수 파일을 생성합니다.
         run: |
           echo "DATABASE_URL=mysql+pymysql://root:1234@db:3306/mydatabase_test" > .env
           echo "SENDER_EMAIL=${{ secrets.SENDER_EMAIL }}" >> .env
@@ -67,43 +61,53 @@ jobs:
           echo "EMAIL_APP_PASSWORD=${{ secrets.EMAIL_APP_PASSWORD }}" >> .env
 
       - name: Build and run containers with Docker Compose
-        # --build: 이미지를 빌드하고, -d: 백그라운드에서 컨테이너를 실행합니다.
         run: docker compose up -d --build
 
       - name: Wait for services to be healthy
-        # API 서버가 정상적으로 응답할 때까지 최대 60초간 대기합니다.
         run: |
           echo "Waiting for the API server to be ready..."
           timeout 60s bash -c 'until curl -s http://localhost:8000/docs > /dev/null; do echo "Waiting..."; sleep 2; done'
 
       - name: Install test dependencies on runner
-        # Runner에 직접 테스트 실행에 필요한 라이브러리를 설치합니다.
-        run: pip install -r requirements.txt
+        run: |
+          pip install -r requirements.txt
+          # It's recommended to add pytest-json-report to your requirements.txt
+          # but installing it here also works.
+          pip install pytest-json-report
 
-      - name: Run Pytest against the running container
-        # 실행 중인 API 컨테이너를 대상으로 통합 테스트를 수행합니다.
-        run: pytest -v
+      - name: Run Pytest and Generate Report
+        # --json-report flag generates the report file.
+        run: pytest -v --json-report --json-report-file=pytest-report.json
         env:
           API_BASE_URL: 'http://localhost:8000'
+        # Allows the workflow to continue even if tests fail, so we can upload the report.
+        continue-on-error: true
 
       - name: Clean up containers
-        # 테스트 성공/실패 여부와 관계없이 항상 컨테이너를 정리합니다.
+        # This step will always run, regardless of the test outcome.
         if: always()
         run: docker compose down
 
+      - name: Upload QA Report Artifact
+        # Uploads the generated JSON report as an artifact.
+        if: always() # Ensures report is uploaded even on test failure.
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-test-report # Artifact name
+          path: pytest-report.json # Path to the file to upload
+
   # =======================================================
-  # Job 3: Docker 이미지 푸시 (Push to Registry)
+  # Job 3: Push to Registry
   # =======================================================
-  # 모든 테스트를 통과한 이미지를 GitHub Container Registry에 배포합니다.
   push-to-registry:
     name: 3. Push Docker Image to GHCR
     needs: build-and-test
-    # 'main' 브랜치에 'push' 이벤트가 발생했을 때만 실행됩니다.
+    # This job only runs on a push to the main branch.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write # GHCR에 이미지를 푸시하기 위한 권한
+      packages: write # Permission to push to GHCR
 
     steps:
       - name: Checkout repository
@@ -117,7 +121,6 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Extract metadata (tags, labels) for Docker
-        # Git 정보를 기반으로 Docker 이미지 태그와 라벨을 자동으로 생성합니다.
         id: meta
         uses: docker/metadata-action@v5
         with:
