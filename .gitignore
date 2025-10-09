@@ -21,3 +21,4 @@ env/
 
 # GitHub Personal Access Token 내용이 있음
 설명.txt
+secrets.toml
