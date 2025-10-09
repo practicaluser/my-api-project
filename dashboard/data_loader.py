@@ -1,12 +1,10 @@
 # dashboard/data_loader.py
 
 import streamlit as st
-import pandas as pd
 import requests
 import json
 import zipfile
 import io
-from sqlalchemy import create_engine, text
 
 # -----------------------------------------------------------------------------
 # 데이터 소스 1: 운영 DB (MySQL)
