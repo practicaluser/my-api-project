@@ -53,5 +53,3 @@ class SecurityEvent(Base):
     ip_address = Column(String(50), nullable=False, index=True)
     timestamp = Column(DateTime(timezone=True), server_default=func.now())
     description = Column(String(500))  # 이벤트 상세 설명
-
-

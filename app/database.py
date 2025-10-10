@@ -26,6 +26,7 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
 
+
 def get_db():
     """
     FastAPI의 의존성 주입 시스템에서 사용할 데이터베이스 세션 생성 함수.

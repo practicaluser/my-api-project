@@ -9,6 +9,7 @@ from .database import get_db
 # main.py의 app 대신 APIRouter 객체를 생성합니다.
 router = APIRouter()
 
+
 # 여기에 SQL Injection에 취약한 엔드포인트를 그대로 옮겨옵니다.
 @router.get("/items/search")
 def search_items(name: str, request: Request, db: Session = Depends(get_db)):
@@ -20,18 +21,18 @@ def search_items(name: str, request: Request, db: Session = Depends(get_db)):
             event_type="SQL Injection Attempt",
             source_ip=client_ip,
             payload=name,
-            description=f"Suspicious pattern detected in search query for items."
+            description="Suspicious pattern detected in search query for items.",
         )
         db.add(security_event)
         db.commit()
 
     raw_query = f"SELECT * FROM items WHERE name = '{name}'"
-    
+
     try:
         result = db.execute(text(raw_query))
         items = [dict(row._mapping) for row in result.fetchall()]
         if not items:
             return {"message": "No items found."}
         return items
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="An error occurred.")
