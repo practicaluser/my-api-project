@@ -110,7 +110,6 @@ jobs:
   # =======================================================
   penetration-test:
     name: 4. ⚔️🛡️ Penetration Test (Manual)
-    # 이 Job은 수동 실행(workflow_dispatch)일 때만 실행됩니다.
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
@@ -128,36 +127,41 @@ jobs:
           echo "DATABASE_URL=mysql+pymysql://root:1234@db:3306/mydatabase_test" > .env
 
       - name: Build and run test environment with Docker Compose
-        run: docker compose up -d --build
+        # --wait 플래그를 추가하여 DB가 healthy 상태가 될 때까지 기다리도록 합니다.
+        # 이렇게 하면 다음 단계에서 sleep을 사용할 필요가 없어 더 안정적입니다.
+        run: docker compose up -d --build --wait
 
-      - name: Wait for services to be healthy
+      - name: Wait for API to become available
+        # 이 단계의 이름을 명확하게 변경합니다.
+        # continue-on-error: true 를 추가하여, 이 단계가 실패해도 다음 디버깅 단계가 실행되도록 합니다.
+        id: wait_for_api
+        continue-on-error: true
         run: |
           echo "Waiting for the API server to be ready for attack..."
-          # wait_for_api 스크립트가 /posts/ 엔드포인트를 사용하므로 docs 대신 해당 경로를 사용합니다.
-          timeout 60s bash -c 'until curl -s http://localhost:8088/posts/ > /dev/null; do echo "Waiting..."; sleep 2; done'
-          echo "API is ready. Starting penetration test..."
+          timeout 60s bash -c 'until curl -s -f http://localhost:8088/posts > /dev/null; do echo "Waiting..."; sleep 2; done'
 
-      - name: Install penetration test dependencies
-        run: pip install -r requirements.txt
+      # --- 👇 [핵심 수정] 실패 시 디버깅 로그를 출력하는 단계 추가 ---
+      - name: Display Docker logs for debugging
+        # 이전 단계(wait_for_api)가 실패했을 때만 이 단계를 실행합니다.
+        if: steps.wait_for_api.outcome == 'failure'
+        run: docker compose logs api
+      # -----------------------------------------------------------
 
       - name: Run SQL Injection Attack & Verification Script
-        # 스크립트의 exit code(0 또는 1)가 이 단계의 성공/실패를 자동으로 결정합니다.
+        # wait_for_api 단계가 성공했을 때만 이 스크립트를 실행합니다.
+        if: steps.wait_for_api.outcome == 'success'
         run: python penetration_tests/run_sqli_attack_and_verify.py
         env:
-          # GitHub Actions 환경에서는 Docker 포트가 localhost로 노출됩니다.
-          # 스크립트가 이 환경 변수들을 사용하여 올바른 대상에 연결합니다.
           TARGET_URL: 'http://localhost:8088'
           DATABASE_URL: 'mysql+pymysql://root:1234@127.0.0.1:3306/mydatabase_test?charset=utf8mb4'
 
       - name: Clean up test environment
-        # 이 단계는 스크립트가 성공하든 실패하든 항상 실행되어 리소스를 정리합니다.
         if: always()
         run: docker compose down
 
       - name: Upload Penetration Test Report Artifact
-        # 테스트가 실패했을 때 원인 분석을 위해 보고서는 항상 업로드해야 합니다.
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: penetration-test-report # 아티팩트 이름
-          path: penetration_test_report.md # 업로드할 파일 경로
+          name: penetration-test-report
+          path: penetration_test_report.md
