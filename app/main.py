@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
@@ -5,7 +6,7 @@ from typing import List
 # 다른 파일에서 필요한 클래스와 함수들을 가져옵니다.
 from . import models, schemas
 from contextlib import asynccontextmanager
-from .database import SessionLocal, engine
+from .database import SessionLocal, engine, get_db
 
 # 데이터베이스 테이블 생성 (애플리케이션 시작 시)
 # models.Base.metadata.create_all(bind=engine) # <-- 이 줄을 삭제하거나 주석 처리!
@@ -24,12 +25,12 @@ app = FastAPI()
 
 
 # API 요청마다 데이터베이스 세션을 생성하고, 요청이 끝나면 닫는 의존성 함수
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+# def get_db():
+#     db = SessionLocal()
+#     try:
+#         yield db
+#     finally:
+#         db.close()
 
 
 # --- CRUD 엔드포인트 구현 ---
@@ -86,3 +87,13 @@ def delete_post(post_id: int, db: Session = Depends(get_db)):
     db.delete(db_post)
     db.commit()
     return
+
+# --- 환경 변수를 확인하여 테스트용 라우터를 조건부로 로드 ---
+# 환경 변수 'APP_ENV'의 값을 읽어오고, 없으면 기본값 'production' 사용
+APP_ENV = os.getenv("APP_ENV", "production")
+
+if APP_ENV == "test":
+    # 'test' 환경일 때만 취약한 라우터를 임포트하고 앱에 추가
+    from . import vulnerable_test_router
+    app.include_router(vulnerable_test_router.router, prefix="/test-api", tags=["Vulnerable Test"])
+    print("✅✅✅ Vulnerable test endpoints have been loaded for testing environment. ✅✅✅")

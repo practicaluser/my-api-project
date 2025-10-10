@@ -3,8 +3,11 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 
 # mysql+mysqlconnector → mysql+pymysql 로 변경
 # SQLALCHEMY_DATABASE_URL = "mysql+pymysql://root:1234@127.0.0.1:3306/mydatabase?charset=utf8mb4"
+# SQLALCHEMY_DATABASE_URL = (
+#     "mysql+pymysql://root:1234@127.0.0.1:3306/mydatabase_test?charset=utf8mb4"
+# )
 SQLALCHEMY_DATABASE_URL = (
-    "mysql+pymysql://root:1234@127.0.0.1:3306/mydatabase_test?charset=utf8mb4"
+    "mysql+pymysql://root:1234@db:3306/mydatabase_test?charset=utf8mb4"
 )
 
 # engine = create_engine(SQLALCHEMY_DATABASE_URL, pool_pre_ping=True)
@@ -22,3 +25,14 @@ engine = create_engine(
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
+
+def get_db():
+    """
+    FastAPI의 의존성 주입 시스템에서 사용할 데이터베이스 세션 생성 함수.
+    하나의 API 요청 사이클 동안만 유지되는 세션을 생성하고, 요청이 끝나면 자동으로 닫습니다.
+    """
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()

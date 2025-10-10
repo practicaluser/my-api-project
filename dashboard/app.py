@@ -16,7 +16,6 @@ st.title("🚀 통합 품질 대시보드")
 st.caption("운영, 성능, QA 데이터를 통합하여 애플리케이션의 상태를 한눈에 파악합니다.")
 
 # --- 데이터 로딩 ---
-# 로더 함수를 호출하여 데이터 가져오기
 db_data = load_db_data()
 qa_report, latest_commit, error_msg = load_latest_qa_report()
 
@@ -51,15 +50,15 @@ with tab1:
     else:
         col1.metric("최신 빌드 테스트 성공률", "N/A", "데이터 로드 실패")
 
-    # KPI 2 & 3: DB 기반 데이터 (예시)
-    if db_data and "time_series_requests" in db_data:
-        total_requests_24h = db_data["time_series_requests"][
-            "request_count"
-        ].sum()  # 예시 계산
-        avg_response_time = db_data["slowest_10_endpoints"][
-            "avg_duration_ms"
-        ].mean()  # 예시 계산
-        col2.metric("최근 24시간 API 총 요청 수", f"{total_requests_24h:,} 건")
+    # KPI 2 & 3: DB 기반 데이터
+    if db_data and "time_series_requests" in db_data and "slowest_10_endpoints" in db_data:
+        # <<< 수정: SQL 쿼리(1.1)의 컬럼 'total_requests'와 일치시킴
+        total_requests_24h = db_data["time_series_requests"]['total_requests'].sum()
+        
+        # <<< 수정: SQL 쿼리(1.3)의 컬럼 'avg_response_time_ms'와 일치시킴
+        avg_response_time = db_data["slowest_10_endpoints"]['avg_response_time_ms'].mean()
+        
+        col2.metric("최근 24시간 API 총 요청 수", f"{int(total_requests_24h):,} 건")
         col3.metric("최근 24시간 평균 응답 시간", f"{avg_response_time:.2f} ms")
     else:
         col2.metric("최근 24시간 API 총 요청 수", "N/A")
@@ -84,17 +83,12 @@ with tab2:
     if not db_data:
         st.warning("운영 데이터를 불러올 수 없습니다.")
     else:
-        # 상호작용 필터 (예시)
-        date_range = st.date_input(
-            "데이터 조회 기간을 선택하세요",
-            [],  # (pd.to_datetime('today') - pd.DateOffset(days=7), pd.to_datetime('today')),
-            key="date_filter",
-        )
-
         # 1. 시간대별 API 요청 수 추이
         st.subheader("시간대별 API 요청 수")
         if "time_series_requests" in db_data:
-            st.line_chart(db_data["time_series_requests"].set_index("hour"))
+            # <<< 수정: SQL 쿼리(1.1)의 컬럼 'hour_of_day'와 일치시킴
+            chart_data = db_data["time_series_requests"].set_index("hour_of_day")
+            st.line_chart(chart_data['total_requests'])
 
         col1, col2 = st.columns(2)
 
@@ -102,11 +96,13 @@ with tab2:
         with col1:
             st.subheader("가장 많이 요청된 엔드포인트 TOP 10")
             if "top_10_endpoints" in db_data:
-                st.bar_chart(db_data["top_10_endpoints"].set_index("endpoint"))
+                # <<< 수정: SQL 쿼리(1.2)의 컬럼 'path'와 일치시킴
+                chart_data = db_data["top_10_endpoints"].set_index("path")
+                st.bar_chart(chart_data['request_count'])
 
         # 3. 가장 느린 엔드포인트
         with col2:
-            st.subheader("가장 느린 엔드포인트 TOP 10 (평균 응답속도)")
+            st.subheader("엔드포인트별 평균 응답속도")
             if "slowest_10_endpoints" in db_data:
                 st.dataframe(db_data["slowest_10_endpoints"], use_container_width=True)
 

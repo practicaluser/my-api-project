@@ -37,6 +37,7 @@ class AccessLog(Base):
     details = Column(Text, nullable=True)  # 상세 정보는 없을 수 있으므로 nullable=True
 
 
+# --- ⚔️🛡️ 과제 4.1: 보안 이벤트 로깅을 위한 모델 추가 ---
 class SecurityEvent(Base):
     """
     보안 이벤트 기록을 위한 테이블
@@ -52,3 +53,5 @@ class SecurityEvent(Base):
     ip_address = Column(String(50), nullable=False, index=True)
     timestamp = Column(DateTime(timezone=True), server_default=func.now())
     description = Column(String(500))  # 이벤트 상세 설명
+
+

@@ -5,6 +5,11 @@ on:
     branches: ['main']
   pull_request:
     branches: ['main']
+  # =======================================================
+  # 👇 [4.1] 수동 실행 트리거 추가 ---
+  # =======================================================
+  # 이제 GitHub Actions 탭에서 "Run workflow" 버튼으로 이 파이프라인을 수동 실행할 수 있습니다.
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
@@ -12,10 +17,101 @@ env:
 
 jobs:
   # =======================================================
-  # Job 1: Static Analysis Quality Gate
+  # Job 1, 2, 3 (기존 CI 잡들)
   # =======================================================
+  # 이 잡들은 수동 실행 시에는 실행되지 않도록 조건을 추가합니다. (if: ...)
   static-analysis:
     name: 1. Static Analysis
+    if: github.event_name != 'workflow_dispatch' # 수동 실행이 아닐 때만 실행
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      # ... (이하 내용은 기존과 동일) ...
+      - name: Install dependencies
+        run: pip install black ruff safety
+      - name: Check formatting with Black
+        run: black --check .
+      - name: Lint with Ruff
+        run: ruff check .
+      - name: Scan dependencies with Safety
+        run: |
+          pip install -r requirements.txt
+          safety check -r requirements.txt
+
+  build-and-test:
+    name: 2. Build and Integration Test
+    if: github.event_name != 'workflow_dispatch' # 수동 실행이 아닐 때만 실행
+    needs: static-analysis
+    runs-on: ubuntu-latest
+    steps:
+      # ... (기존 build-and-test 잡의 모든 스텝은 변경 없음) ...
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Create .env file for Docker Compose
+        run: |
+          echo "DATABASE_URL=mysql+pymysql://root:1234@db:3306/mydatabase_test" > .env
+      - name: Build and run containers with Docker Compose
+        run: docker compose up -d --build
+      - name: Wait for services to be healthy
+        run: |
+          echo "Waiting for the API server to be ready..."
+          timeout 60s bash -c 'until curl -s http://localhost:8088/docs > /dev/null; do echo "Waiting..."; sleep 2; done'
+      - name: Install test dependencies
+        run: pip install -r requirements.txt pytest pytest-json-report
+      - name: Run Pytest and Generate Report
+        run: pytest -v --json-report --json-report-file=pytest-report.json
+        env:
+          API_BASE_URL: 'http://localhost:8088'
+        continue-on-error: true
+      - name: Clean up containers
+        if: always()
+        run: docker compose down
+      - name: Upload QA Report Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-test-report
+          path: pytest-report.json
+
+  push-to-registry:
+    name: 3. Push Docker Image to GHCR
+    if: github.event_name != 'workflow_dispatch' && github.event_name == 'push' && github.ref == 'refs/heads/main' # 수동 실행이 아닐 때만 실행
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      # ... (기존 push-to-registry 잡의 모든 스텝은 변경 없음) ...
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  # =======================================================
+  # 👇 [4.1] 새로운 모의 침투 테스트 Job 추가 ---
+  # =======================================================
+  penetration-test:
+    name: 4. ⚔️🛡️ Penetration Test (Manual)
+    # 이 Job은 수동 실행(workflow_dispatch)일 때만 실행됩니다.
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -25,111 +121,43 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          cache: 'pip' # Speed up dependency installation by caching
+          cache: 'pip'
 
-      - name: Install dependencies
-        run: pip install black ruff safety
-
-      - name: Check formatting with Black
-        run: black --check .
-
-      - name: Lint with Ruff
-        run: ruff check .
-
-      - name: Scan dependencies with Safety
-        run: |
-          pip install -r requirements.txt
-          safety check -r requirements.txt
-
-  # =======================================================
-  # Job 2: Build & Integration Test Gate
-  # =======================================================
-  build-and-test:
-    name: 2. Build and Integration Test
-    needs: static-analysis
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Create .env file for Docker Compose
+      - name: Create .env file for Test Environment
         run: |
           echo "DATABASE_URL=mysql+pymysql://root:1234@db:3306/mydatabase_test" > .env
-          echo "SENDER_EMAIL=${{ secrets.SENDER_EMAIL }}" >> .env
-          echo "RECEIVER_EMAIL=${{ secrets.RECEIVER_EMAIL }}" >> .env
-          echo "EMAIL_APP_PASSWORD=${{ secrets.EMAIL_APP_PASSWORD }}" >> .env
 
-      - name: Build and run containers with Docker Compose
+      - name: Build and run test environment with Docker Compose
         run: docker compose up -d --build
 
       - name: Wait for services to be healthy
         run: |
-          echo "Waiting for the API server to be ready..."
-          timeout 60s bash -c 'until curl -s http://localhost:8088/docs > /dev/null; do echo "Waiting..."; sleep 2; done'
+          echo "Waiting for the API server to be ready for attack..."
+          # wait_for_api 스크립트가 /posts/ 엔드포인트를 사용하므로 docs 대신 해당 경로를 사용합니다.
+          timeout 60s bash -c 'until curl -s http://localhost:8088/posts/ > /dev/null; do echo "Waiting..."; sleep 2; done'
+          echo "API is ready. Starting penetration test..."
 
-      - name: Install test dependencies on runner
-        run: |
-          pip install -r requirements.txt
-          # It's recommended to add pytest-json-report to your requirements.txt
-          # but installing it here also works.
-          pip install pytest-json-report
+      - name: Install penetration test dependencies
+        run: pip install -r requirements.txt
 
-      - name: Run Pytest and Generate Report
-        # --json-report flag generates the report file.
-        run: pytest -v --json-report --json-report-file=pytest-report.json
+      - name: Run SQL Injection Attack & Verification Script
+        # 스크립트의 exit code(0 또는 1)가 이 단계의 성공/실패를 자동으로 결정합니다.
+        run: python penetration_tests/run_sqli_attack_and_verify.py
         env:
-          API_BASE_URL: 'http://localhost:8088'
-        # Allows the workflow to continue even if tests fail, so we can upload the report.
-        continue-on-error: true
+          # GitHub Actions 환경에서는 Docker 포트가 localhost로 노출됩니다.
+          # 스크립트가 이 환경 변수들을 사용하여 올바른 대상에 연결합니다.
+          TARGET_URL: 'http://localhost:8088'
+          DATABASE_URL: 'mysql+pymysql://root:1234@127.0.0.1:3306/mydatabase_test?charset=utf8mb4'
 
-      - name: Clean up containers
-        # This step will always run, regardless of the test outcome.
+      - name: Clean up test environment
+        # 이 단계는 스크립트가 성공하든 실패하든 항상 실행되어 리소스를 정리합니다.
         if: always()
         run: docker compose down
 
-      - name: Upload QA Report Artifact
-        # Uploads the generated JSON report as an artifact.
-        if: always() # Ensures report is uploaded even on test failure.
+      - name: Upload Penetration Test Report Artifact
+        # 테스트가 실패했을 때 원인 분석을 위해 보고서는 항상 업로드해야 합니다.
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: qa-test-report # Artifact name
-          path: pytest-report.json # Path to the file to upload
-
-  # =======================================================
-  # Job 3: Push to Registry
-  # =======================================================
-  push-to-registry:
-    name: 3. Push Docker Image to GHCR
-    needs: build-and-test
-    # This job only runs on a push to the main branch.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write # Permission to push to GHCR
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          name: penetration-test-report # 아티팩트 이름
+          path: penetration_test_report.md # 업로드할 파일 경로
