@@ -9,6 +9,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # --- 👇 [수정] app.database에서 engine과 Base를 직접 가져옵니다 ---
 from app.database import engine, Base
+
 # from app.models import *  # models.py에 정의된 모든 모델을 가져옵니다.
 
 # -------------------------------------------------------------
